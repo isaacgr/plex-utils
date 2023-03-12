@@ -8,42 +8,42 @@ import os
 import subprocess
 
 def convert_file(input_file, convert):
-    escaped_input_file = input_file.replace("'", "'\\''")
+    #escaped_input_file = input_file.replace("'", "'\\''")
     output_file = os.path.splitext(input_file)[0] + '.mp4'
-    probe_command = [
-            '/usr/lib/jellyfin-ffmpeg/ffprobe',
-            '-v',
-            'error',
-            '-select_streams',
-            'v:0',
-            '-show_entries',
-            'stream=codec_name',
-            '-of',
-            'default=noprint_wrappers=1:nokey=1',
-            f'"{escaped_input_file}"'
-    ]
-    video_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
-    probe_command = [
-            '/usr/lib/jellyfin-ffmpeg/ffprobe',
-            '-v',
-            'error',
-            '-select_streams',
-            'a:0',
-            '-show_entries',
-            'stream=codec_name',
-            '-of',
-            'default=noprint_wrappers=1:nokey=1',
-            f'"{escaped_input_file}"'
-    ]
-    audio_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
+    #probe_command = [
+    #        '/usr/lib/jellyfin-ffmpeg/ffprobe',
+    #        '-v',
+    #        'error',
+    #        '-select_streams',
+    #        'v:0',
+    #        '-show_entries',
+    #        'stream=codec_name',
+    #        '-of',
+    #        'default=noprint_wrappers=1:nokey=1',
+    #        f'"{escaped_input_file}"'
+    #]
+    #video_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
+    #probe_command = [
+    #        '/usr/lib/jellyfin-ffmpeg/ffprobe',
+    #        '-v',
+    #        'error',
+    #        '-select_streams',
+    #        'a:0',
+    #        '-show_entries',
+    #        'stream=codec_name',
+    #        '-of',
+    #        'default=noprint_wrappers=1:nokey=1',
+    #        f'"{escaped_input_file}"'
+    #]
+    ##audio_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
 
-    if video_codec == b'h264' and audio_codec == b'aac':
-        print(f'[{input_file}] is already in H.264 and AAC format.')
-    else:
-        print(f'[%s]: Not in H.264 and AAC format. Converting...' % input_file)
-        if convert:
-            command = ['/usr/lib/jellyfin-ffmpeg/ffmpeg', '-y', '-i', '"%s"' % input_file, '-c:v', 'libx264', '-c:a', 'aac', '-c:s?', 'copy', output_file]
-            subprocess.call(command)
+   # if video_codec == b'h264' and audio_codec == b'aac':
+   #     print(f'[{input_file}] is already in H.264 and AAC format.')
+   # else:
+    print(f'[%s]: Converting to [%s]...' % (input_file, output_file))
+    if convert:
+        command = ['/usr/lib/jellyfin-ffmpeg/ffmpeg', '-y', '-i', '%s' % input_file, '-c:v', 'copy', '-c:a', 'aac', '-c:s', 'copy', output_file]
+        subprocess.call(command)
 
 
 def is_valid_stream_order(stream_indexes):
@@ -127,7 +127,7 @@ def check_files(directory, convert_media=False, reorder_streams=False, recursive
                 continue
             else:
                 convert_file(path, convert_media)
-                reorder_stream_indexes(path, reorder_streams)
+                #reorder_stream_indexes(path, reorder_streams)
 
 
 def main():
