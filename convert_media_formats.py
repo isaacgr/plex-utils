@@ -9,41 +9,53 @@ import subprocess
 
 def convert_file(input_file, convert):
     #escaped_input_file = input_file.replace("'", "'\\''")
+    escaped_input_file = input_file
     output_file = os.path.splitext(input_file)[0] + '.mp4'
-    #probe_command = [
-    #        '/usr/lib/jellyfin-ffmpeg/ffprobe',
-    #        '-v',
-    #        'error',
-    #        '-select_streams',
-    #        'v:0',
-    #        '-show_entries',
-    #        'stream=codec_name',
-    #        '-of',
-    #        'default=noprint_wrappers=1:nokey=1',
-    #        f'"{escaped_input_file}"'
-    #]
-    #video_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
-    #probe_command = [
-    #        '/usr/lib/jellyfin-ffmpeg/ffprobe',
-    #        '-v',
-    #        'error',
-    #        '-select_streams',
-    #        'a:0',
-    #        '-show_entries',
-    #        'stream=codec_name',
-    #        '-of',
-    #        'default=noprint_wrappers=1:nokey=1',
-    #        f'"{escaped_input_file}"'
-    #]
-    ##audio_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
+    probe_command = [
+            '/usr/lib/jellyfin-ffmpeg/ffprobe',
+            '-v',
+            'error',
+            '-select_streams',
+            'v:0',
+            '-show_entries',
+            'stream=codec_name',
+            '-of',
+            'default=noprint_wrappers=1:nokey=1',
+            f'"{escaped_input_file}"'
+    ]
+    video_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
+    probe_command = [
+            '/usr/lib/jellyfin-ffmpeg/ffprobe',
+            '-v',
+            'error',
+            '-select_streams',
+            'a:0',
+            '-show_entries',
+            'stream=codec_name',
+            '-of',
+            'default=noprint_wrappers=1:nokey=1',
+            f'"{escaped_input_file}"'
+    ]
+    audio_codec = subprocess.check_output(' '.join(probe_command), shell=True).strip()
+    valid_video_codecs = [b'h264', b'hevc']
 
-   # if video_codec == b'h264' and audio_codec == b'aac':
-   #     print(f'[{input_file}] is already in H.264 and AAC format.')
-   # else:
-    print(f'[%s]: Converting to [%s]...' % (input_file, output_file))
-    if convert:
-        command = ['/usr/lib/jellyfin-ffmpeg/ffmpeg', '-y', '-i', '%s' % input_file, '-c:v', 'copy', '-c:a', 'aac', '-c:s', 'copy', output_file]
-        subprocess.call(command)
+    if video_codec in valid_video_codecs and audio_codec == b'aac':
+        print(f'[{input_file}]: codecs are fully supported.')
+    elif video_codec in valid_video_codecs and audio_codec != b'aac':
+        print(f'[%s]: Converting to AAC audio...' % (input_file))
+        if convert:
+            command = ['/usr/lib/jellyfin-ffmpeg/ffmpeg', '-y', '-i', '%s' % input_file, '-c:v', 'copy', '-c:a', 'aac', '-c:s', 'copy', output_file]
+            subprocess.call(command)
+    elif video_codec not in valid_video_codecs and audio_codec == b'aac':
+        print(f'[%s]: Converting to H.264 video...' % (input_file))
+        if convert:
+            command = ['/usr/lib/jellyfin-ffmpeg/ffmpeg', '-y', '-i', '%s' % input_file, '-c:v', 'libx264', '-c:a', 'copy', '-c:s', 'copy', output_file]
+            subprocess.call(command)
+    else:
+        print(f'[%s]: Converting video and audio...' % (input_file))
+        if convert:
+            command = ['/usr/lib/jellyfin-ffmpeg/ffmpeg', '-y', '-i', '%s' % input_file, '-c:v', 'libx264', '-c:a', 'aac', '-c:s', 'copy', output_file]
+            subprocess.call(command)
 
 
 def is_valid_stream_order(stream_indexes):
@@ -114,13 +126,13 @@ def parse_commandline():
 
 
 def check_files(directory, convert_media=False, reorder_streams=False, recursive=True):
-    media_extensions = ['.mp3', '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']
+    media_extensions = ['.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']
 
     print('Scanning files in [%s]...' % directory)
     for file in os.listdir(directory):
         path = os.path.join(directory, file)
         if os.path.isdir(path) and recursive:
-            check_files(path)
+            check_files(path, convert_media)
         if os.path.isfile(path):
             extension = os.path.splitext(path)[1].lower()
             if extension not in media_extensions:
@@ -137,7 +149,7 @@ def main():
 
     if options.remove_input_file:
         print('Removing input file. [%s]' % input_file)
-        #os.remove(input_file)
+        os.remove(input_file)
 
 
 if __name__ == '__main__':
