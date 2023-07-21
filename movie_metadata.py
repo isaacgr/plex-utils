@@ -6,18 +6,29 @@ import math
 
 def get_movie_metadata(filename):
     # Run ffprobe on the movie file
-    streams_cmd = ["/usr/lib/jellyfin-ffmpeg/ffprobe", "-v", "error", "-show_entries", "stream=index,codec_type,codec_name,width,height,bit_rate", "-of", "csv=p=0", filename]
+    # outputs something like
+    #
+    # 0,hevc,video,1920,1080
+    # 1,aac,audio,6
+    streams_cmd = [
+        "/usr/lib/jellyfin-ffmpeg/ffprobe", "-v", "error", "-show_entries",
+        "stream=index,codec_type,codec_name,width,height,channels", "-of", "csv=p=0",
+        filename
+    ]
     streams_output = subprocess.check_output(streams_cmd).decode("utf-8").strip()
 
-    format_cmd = ["/usr/lib/jellyfin-ffmpeg/ffprobe", "-v", "error", "-show_entries", "format=format_name", "-of", "csv=p=0", filename]
+    format_cmd = [
+        "/usr/lib/jellyfin-ffmpeg/ffprobe", "-v", "error", "-show_entries",
+        "format=format_name", "-of", "csv=p=0",
+        filename
+    ]
     format_output = subprocess.check_output(format_cmd).decode("utf-8").strip()
 
     # Parse the output and extract the metadata we're interested in
     video_format = None
     video_codec = None
     audio_codec = None
-    video_bitrate = None
-    audio_bitrate = None
+    audio_channels = None
     stream_order = []
     video_resolution = None
 
@@ -31,25 +42,23 @@ def get_movie_metadata(filename):
         parts = line.split(",")
         stream_index = parts[0]
         codec_type = parts[1]
-        if codec_type in ['mjpeg']:
-            continue
         codec_name = parts[2]
-        bitrate = parts[-1]
+        if codec_type == 'mjpeg':
+            continue
         if codec_name.startswith("video"):
             video_codec = codec_type
-            video_bitrate = bitrate
             video_resolution = f"{parts[3]}x{parts[4]}"
             stream_order.append(stream_index)
         elif codec_name.startswith("audio"):
             audio_codec = codec_type
-            audio_bitrate = bitrate
+            audio_channels = parts[3]
             stream_order.append(stream_index)
-    return (filename, video_format, video_codec, audio_codec, video_bitrate, audio_bitrate, ";".join(stream_order), video_resolution)
+    return (filename, video_format, video_codec, audio_codec, ";".join(stream_order), video_resolution, audio_channels)
 
 def write_to_csv(metadata_list, csv_filename):
     # Write the metadata to a CSV file
     with open(csv_filename, mode="w", newline="") as csv_file:
-        fieldnames = ["Filename", "Video Format", "Video Codec", "Audio Codec", "Video Bitrate", "Audio Bitrate", "Stream Order", "Video Resolution"]
+        fieldnames = ["Filename", "Video Format", "Video Codec", "Audio Codec", "Stream Order", "Video Resolution", "Audio Channels"]
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
         writer.writeheader()
@@ -59,10 +68,9 @@ def write_to_csv(metadata_list, csv_filename):
                 "Video Format": metadata[1],
                 "Video Codec": metadata[2],
                 "Audio Codec": metadata[3],
-                "Video Bitrate": metadata[4],
-                "Audio Bitrate": metadata[5],
-                "Stream Order": metadata[6],
-                "Video Resolution": metadata[7]
+                "Stream Order": metadata[4],
+                "Video Resolution": metadata[5],
+                "Audio Channels": metadata[6]
             })
 
 def main():
@@ -90,8 +98,11 @@ def main():
     # Collect metadata for each movie file
     metadata_list = []
     for movie_file in movie_files:
-        metadata = get_movie_metadata(movie_file)
-        metadata_list.append(metadata)
+        try:
+            metadata = get_movie_metadata(movie_file)
+            metadata_list.append(metadata)
+        except subprocess.CalledProcessError:
+            print('Unable to get metadata for %s' % movie_file)
 
     # Write the metadata to a CSV file
     write_to_csv(metadata_list, "movie_metadata.csv")
